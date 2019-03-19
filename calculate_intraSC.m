@@ -15,9 +15,6 @@ function cfg=calculate_intraSC(cfg)
 % 
 %   cft.outdir = label of the output folder where the correlation map nifitis are saved
 
-%%
-%   Output:
-%   cfg.cors = 
 
 %%
 % for usage example, see /m/nbe/scratch/psykoosi/scripts/
@@ -84,5 +81,5 @@ for i=1:nosubs
     nii=fixOriginator(filename,mask);
     save_nii(nii,filename);
 end
-
+cfg.cors=cors;
 fprintf('\n')
