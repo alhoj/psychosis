@@ -1,4 +1,4 @@
-function cfg=calculate_BL_FU_intrasubject_corr(cfg)
+function cfg=calculate_intraSC(cfg)
 % Calculates individual ISC maps with respect to a reference group
 % 
 % Usage:
