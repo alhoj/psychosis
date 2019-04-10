@@ -14,6 +14,12 @@ function cfg=calculate_FC(cfg)
 % 
 %   cfg.res = resolution of the nifti files;  can be '2mm', '4mm', '6mm',
 %   '8mm', '16mm', or '32mm'
+%
+%   cfg.atlas = ROI atlas to be used; leave empty for voxel-to-voxel connectivity
+%
+%   cfg.roiTC = how to extract the roi timecourse; options 'PCA' or 'mean'
+%
+%   cfg.useNonSpatialSmoothedData = 1 -> use non-smoothed, 0 -> use smoothed
 % 
 %   cft.outdir = label of the output folder where the individual ISC nifitis are saved
 
@@ -36,12 +42,18 @@ end
 if ~isempty(cfg.mask) && ~isfile(cfg.mask)
     error(['could not find mask: ' cfg.mask])
 end
+if ~isempty(cfg.atlas) && ~isfile(cfg.atlas)
+    error(['could not find atlas: ' cfg.mask])
+end
+if ~ismember(cfg.roiTC,{'mean','PCA'})
+    error('cfg.roiTC must be either ''mean'' or ''PCA''!')
+end
 
-disp(['Calculating functional connectivity matrices for ' num2str(length(cfg.subs)) ' subjects based on Pearson''s correlation'])
+disp(['Calculating functional connectivity for ' num2str(length(cfg.subs)) ' subjects based on Pearson''s correlation'])
 disp(['using ' cfg.cond ' data'])
 fprintf('\n')
 
-%% Load mask
+%% Load mask and atlas
 
 disp('Loading mask...')
 if isempty(cfg.mask)
@@ -50,8 +62,17 @@ else
     mask=load_nii(cfg.mask);
 end
 inmask=find(mask.img);
-fprintf('\n')
 
+if ~isempty(cfg.atlas)
+    disp('Loading atlas...')
+    atlas=load_nii(['/m/nbe/scratch/psykoosi/masks/' cfg.atlas]);
+    assert(isequal(length(atlas.img(:)),length(mask.img(:))),'mask and atlas voxel resolutions do not match!')
+    atlas=double(atlas.img).*double(mask.img);
+    rois=nonzeros(unique(atlas));
+    nroi=length(rois);
+end
+
+fprintf('\n')
 %% Load brain data
 % Load an example NIFTI file to find the dimensions needed for
 % preallocating the matrices (this will speed things up)
@@ -66,41 +87,54 @@ ntps=size(temp(:,inmask),1);
 nvox=size(temp(:,inmask),2);
 nsub=length(cfg.subs);
 
-% Preallocate data matrices with the dimensions of time points x subjects x voxels 
-allsubs=zeros(ntps,nsub,nvox); 
+% Preallocate data matrix with the dimensions of time points x voxels x subjects  
+TCvox=zeros(ntps,nvox,nsub); 
 
-disp('Loading brain data of subjects of interest...')
-for i=1:nsub
-    disp(['Subject ' cfg.subs{i} ' - ' num2str(i) ' out of ' num2str(nsub)])
+disp('Loading brain data...')
+for subi=1:nsub
+    disp(['Subject ' cfg.subs{subi} ' - ' num2str(subi) ' out of ' num2str(nsub)])
     if cfg.useNonSpatialSmoothedData
-        nii=load_nii(['/m/nbe/scratch/psykoosi/data/' cfg.cond '/' cfg.subs{i} '/epi_noSpatialSmoothing_' cfg.res '.nii']);
+        nii=load_nii(['/m/nbe/scratch/psykoosi/data/' cfg.cond '/' cfg.subs{subi} '/epi_noSpatialSmoothing_' cfg.res '.nii']);
     else
-        nii=load_nii(['/m/nbe/scratch/psykoosi/data/' cfg.cond '/' cfg.subs{i} '/epi_preprocessed_' cfg.res '.nii']);
+        nii=load_nii(['/m/nbe/scratch/psykoosi/data/' cfg.cond '/' cfg.subs{subi} '/epi_preprocessed_' cfg.res '.nii']);
     end
     temp=permute(nii.img,[4 1 2 3]);
-    allsubs(:,i,:)=zscore(temp(:,inmask));
-%     allsubs(:,i,:)=temp(:,inmask);
+    TCvox(:,:,subi)=zscore(temp(:,inmask));
+    
+    for j=1:nroi
+        roi=rois(j); % all rois of the atlas might not be within the mask, hence this
+        if isequal(cfg.roiTC,'PCA')
+            % Principal component timecourses for ROIs
+            [~,PCTC,~] = pca(TCvox(:,atlas(atlas>0)==roi));
+            TCroi(:,roi,subi)=PCTC(:,1);
+        else
+            % Mean timecourses for ROIs
+            TCroi(:,roi,subi)=mean(TCvox(:,atlas(atlas>0)==roi),2);
+        end
+    end
 end
 fprintf('\n')
 
 %% Calculate FC
-% Preallocate the correlation matrix
-cors=zeros(nvox,nvox,nsub);
     
 disp('Calculating FC...')
 for subi=1:nsub
     disp(subi)
-    % Calculate functional correlation over time between all voxels
-    cors(:,:,subi)=corr(squeeze(allsubs(:,subi,:)));
-  
+    if isempty(cfg.atlas)       
+        % Calculate functional correlation over time between all voxels
+        cors(:,:,subi)=corr(squeeze(TCvox(:,:,subi))); 
+    else
+        % Calculate functional correlation over time between all rois
+        cors(:,:,subi)=corr(squeeze(TCroi(:,:,subi)));
+    end
 end
-
+    
 % Replace possible NaN values with zeros.
 cors(isnan(cors))=0;
 
 fprintf('\n')
 
-%% Average to obtain indivual ISC maps
+%% Save subject-wise and group FC matrices
 
 % Take the average across subjects (first Fisher's
 % z-tranform, then averaging, then back to correlation scale)
@@ -118,9 +152,9 @@ if ~exist(dirname,'dir')
 end
 
 disp(['Saving files to directory ' dirname '/'])
-for i=1:nsub
-    filename=[dirname '/' cfg.subs{i} '.mat'];
-    data=cors(:,:,i);
+for subi=1:nsub
+    filename=[dirname '/' cfg.subs{subi} '.mat'];
+    data=cors(:,:,subi);
     save(filename,'data')
 end
 % save group average
