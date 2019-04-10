@@ -1,5 +1,5 @@
 function cfg=calculate_FC(cfg)
-% Calculates individual ISC maps with respect to a reference group
+% Calculates voxel-to-voxel functional connectivity
 % 
 % Usage:
 %   cfg = calculate_FC(cfg);
@@ -19,8 +19,7 @@ function cfg=calculate_FC(cfg)
 
 %%
 %   Output:
-%   cfg.cors = temporal correlation of all subjects of interest to all
-%   reference subjects (matrix with dimensions of voxels x subjects-of-interest x references
+%   cfg.cors = correlation matrix (voxels x voxels x subjects)
 
 
 %% Input validation
