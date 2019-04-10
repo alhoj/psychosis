@@ -39,11 +39,11 @@ end
 if ~ismember(cfg.res,{'2mm', '4mm', '6mm', '8mm', '16mm', '32mm'}) 
     error('cfg.res has to be either ''2mm'', ''4mm'', ''6mm'', ''8mm'', ''16mm'', or ''32mm''')
 end
-if ~isempty(cfg.mask) && ~isfile(cfg.mask)
+if ~isempty(cfg.mask) && ~isfile(['/m/nbe/scratch/psykoosi/masks/' cfg.mask])
     error(['could not find mask: ' cfg.mask])
 end
-if ~isempty(cfg.atlas) && ~isfile(cfg.atlas)
-    error(['could not find atlas: ' cfg.mask])
+if ~isempty(cfg.atlas) && ~isfile(['/m/nbe/scratch/psykoosi/masks/' cfg.atlas])
+    error(['could not find atlas: ' cfg.atlas])
 end
 if ~ismember(cfg.roiTC,{'mean','PCA'})
     error('cfg.roiTC must be either ''mean'' or ''PCA''!')
