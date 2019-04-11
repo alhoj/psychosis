@@ -1,4 +1,4 @@
-function cfg=calculate_FC(cfg)
+function cfg=calculate_FC_generic(cfg)
 % Calculates voxel-to-voxel functional connectivity
 % 
 % Usage:
@@ -41,7 +41,11 @@ if ~ismember(cfg.roiTC,{'mean','PCA'})
     error('cfg.roiTC must be either ''mean'' or ''PCA''!')
 end
 
-disp(['Calculating functional connectivity for ' num2str(length(cfg.subs)) ' subjects based on Pearson''s correlation'])
+if isempty(cfg.atlas)
+    disp(['Calculating voxel-to-voxel functional connectivity for ' num2str(length(cfg.subs)) ' subjects based on Pearson''s correlation'])
+else
+    disp(['Calculating functional connectivity for ' num2str(length(cfg.subs)) ' subjects between ROIs from atlas ''' cfg.atlas ''' based on Pearson''s correlation'])
+end
 fprintf('\n')
 
 %% Load mask and atlas
